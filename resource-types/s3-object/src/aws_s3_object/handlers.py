@@ -1,5 +1,13 @@
+import botocore
+import traceback
 import logging
-from typing import Any, MutableMapping, Optional
+from typing import (
+    Any,
+    Dict,
+    List,
+    MutableMapping,
+    Optional
+)
 from cloudformation_cli_python_lib import (
     Action,
     HandlerErrorCode,
@@ -11,17 +19,7 @@ from cloudformation_cli_python_lib import (
     identifier_utils,
 )
 
-from typing import (
-    Any,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-)
-
-from .models import ResourceHandlerRequest, ResourceModel
+from .models import ResourceHandlerRequest, ResourceModel, Tag
 
 # Use this logger to forward log messages to CloudWatch Logs.
 CALLBACK_DELAY_SECONDS = 5
@@ -31,6 +29,9 @@ TYPE_NAME = "AWS::S3::Object"
 resource = Resource(TYPE_NAME, ResourceModel)
 test_entrypoint = resource.test_entrypoint
 
+# Define a context for the callback logic.  The value for the 'status'
+# key in the dictionary below is consumed in is_callback() and in
+# _callback_helper(), that are invoked from a given handler.
 CALLBACK_STATUS_IN_PROGRESS = {
     "status": OperationStatus.IN_PROGRESS,
 }
@@ -172,8 +173,69 @@ def delete_handler(
         status=OperationStatus.IN_PROGRESS,
         resourceModel=None,
     )
-    # TODO: put code here
-    return progress
+    LOG.debug(f"Progress status: {progress.status}")
+
+    # Callback context logic.
+    if _is_callback(
+        callback_context,
+    ):
+        return _callback_helper(
+            session,
+            request,
+            callback_context,
+            model,
+            is_delete_handler=True,
+        )
+    else:
+        LOG.debug("No callback context present")
+
+    try:
+        if model and model.BucketName:
+            model_bucket_name = model.BucketName
+        if model and model.ObjectKey:
+            model_object_key = model.ObjectKey
+        
+        client = _get_session_client(
+            session,
+            "s3",
+        )
+        # Call the Read handler to look for the resource, and return a
+        # NotFound handler error code if the resource is not found.
+        rh = read_handler(
+            session,
+            request,
+            callback_context,
+        )
+        if rh.errorCode:
+            if rh.errorCode == HandlerErrorCode.NotFound:
+                return _progress_event_failed(
+                    handler_error_code=HandlerErrorCode.NotFound,
+                    error_message=str(rh.message),
+                    traceback_content=None,
+                )
+        if model:
+            client.delete_object(
+                Bucket=model_bucket_name,
+                Key=model_object_key
+            )
+        
+    except botocore.exceptions.ClientError as ce:
+        return _progress_event_failed(
+            handler_error_code=_get_handler_error_code(
+                ce.response["Error"]["Code"],
+            ),
+            error_message=str(ce),
+            traceback_content=traceback.format_exc(),
+        )
+    except Exception as e:
+        return _progress_event_failed(
+            handler_error_code=HandlerErrorCode.InternalFailure,
+            error_message=str(e),
+            traceback_content=traceback.format_exc(),
+        )
+    return _progress_event_success(
+        model=model,
+    )
 
 
 @resource.handler(Action.READ)
@@ -183,10 +245,70 @@ def read_handler(
     callback_context: MutableMapping[str, Any],
 ) -> ProgressEvent:
     model = request.desiredResourceState
-    # TODO: put code here
-    return ProgressEvent(
-        status=OperationStatus.SUCCESS,
+    progress: ProgressEvent = ProgressEvent(
+        status=OperationStatus.IN_PROGRESS,
         resourceModel=model,
+    )
+    LOG.debug(f"Progress status: {progress.status}")
+    
+    try:
+        model_object_key = ""
+        model_bucket_name = ""
+        if model and model.ObjectKey:
+            model_object_key = model.ObjectKey
+        if model and model.BucketName:
+            model_bucket_name = model.BucketName
+
+        client = _get_session_client(
+            session,
+            "s3",
+        )
+        
+        # Set object body
+        response = client.get_object(
+            Bucket=model_bucket_name,
+            Key=model_object_key
+        )
+        object_body = response['Body']
+        object_body_contents = object_body.read()
+        if model:
+            model.ObjectContents = object_body_contents
+        
+        # Set ARN
+        model.ObjectArn = f"arn:aws:s3:::{model_bucket_name}/{model_object_key}"
+
+        # Set object tags
+        response = client.get_object_tagging(
+            Bucket=model_bucket_name,
+            Key=model_object_key
+        )
+        tag_set = response['TagSet']
+        model.Tags = _get_model_tags_from_tags(tag_set)
+        
+    except botocore.exceptions.ClientError as ce:
+        return _progress_event_failed(
+            handler_error_code=_get_handler_error_code(
+                ce.response["Error"]["Code"],
+            ),
+            error_message=str(ce),
+            traceback_content=traceback.format_exc(),
+        )
+    except botocore.exceptions.GeneralServiceException as gse:
+        return _progress_event_failed(
+            handler_error_code=_get_handler_error_code(
+                ce.response["Error"]["Code"],
+            ),
+            error_message=str(ce),
+            traceback_content=traceback.format_exc(),
+        )
+    except Exception as e:
+        return _progress_event_failed(
+            handler_error_code=HandlerErrorCode.InternalFailure,
+            error_message=str(e),
+            traceback_content=traceback.format_exc(),
+        )
+    return _progress_event_success(
+        model=model,
     )
 
 
@@ -196,11 +318,49 @@ def list_handler(
     request: ResourceHandlerRequest,
     callback_context: MutableMapping[str, Any],
 ) -> ProgressEvent:
-    # TODO: put code here
-    return ProgressEvent(
-        status=OperationStatus.SUCCESS,
-        resourceModels=[],
+    model = request.desiredResourceState
+    models = []
+    
+    try:
+        
+        if model and model.BucketName:
+            model_bucket_name = model.BucketName
+        
+        client = _get_session_client(
+            session,
+            "s3"
+        )
+        
+        response = client.list_objects_v2(
+            Bucket=model_bucket_name
+        )
+        contents = response['Contents']
+        models = [ ResourceModel(
+            ObjectArn=f'arn:aws:s3:::{model_bucket_name}/{content["Key"]}',
+            ObjectKey=content['Key'],
+            BucketName=model_bucket_name,
+            ObjectContents=None,
+            Tags=None
+        ) for content in contents ]
+    except botocore.exceptions.ClientError as ce:
+        return _progress_event_failed(
+            handler_error_code=_get_handler_error_code(
+                ce.response["Error"]["Code"],
+            ),
+            error_message=str(ce),
+            traceback_content=traceback.format_exc(),
+        )
+    except Exception as e:
+        return _progress_event_failed(
+            handler_error_code=HandlerErrorCode.InternalFailure,
+            error_message=str(e),
+            traceback_content=traceback.format_exc(),
+        )
+    return _progress_event_success(
+        is_list_handler=True,
+        models=models
     )
+
 
 def _is_callback(
     callback_context: MutableMapping[str, Any],
@@ -261,6 +421,56 @@ def _callback_helper(
         return _progress_event_callback(
             model=model,
         )
+
+    
+def _get_handler_error_code(
+    api_error_code: str,
+) -> HandlerErrorCode:
+    """Get a handler error code for a given service API error code."""
+    LOG.debug("_get_handler_error_code()")
+
+    # Handler error codes in the User Guide for Extension Development:
+    # https://docs.aws.amazon.com/cloudformation-cli/latest/userguide/resource-type-test-contract-errors.html
+    #
+    # Error codes for the Amazon EC2 API:
+    # https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html
+    if api_error_code == "NoSuchKey":
+        return HandlerErrorCode.NotFound
+    elif api_error_code in [
+        "InvalidParameter",
+        "InvalidParameterCombination",
+        "InvalidParameterValue",
+        "InvalidTagKey.Malformed",
+        "MissingAction",
+        "MissingParameter",
+        "UnknownParameter",
+        "ValidationError",
+    ]:
+        return HandlerErrorCode.InvalidRequest
+    # TODO
+    # elif api_error_code in [
+    # ]:
+    #     return HandlerErrorCode.ServiceLimitExceeded
+    elif api_error_code in [
+        "RequestLimitExceeded"
+    ]:
+        return HandlerErrorCode.Throttling
+    else:
+        return HandlerErrorCode.GeneralServiceException
+
+
+def _progress_event_callback(
+    model: Optional[ResourceModel],
+) -> ProgressEvent:
+    """Return a ProgressEvent indicating a callback should occur next."""
+    LOG.debug("_progress_event_callback()")
+
+    return ProgressEvent(
+        status=OperationStatus.IN_PROGRESS,
+        resourceModel=model,
+        callbackContext=CALLBACK_STATUS_IN_PROGRESS,
+        callbackDelaySeconds=CALLBACK_DELAY_SECONDS,
+    )
 
 
 def _progress_event_success(
@@ -325,6 +535,7 @@ def _progress_event_failed(
         f"Error: {error_message}",
     )
 
+
 def _get_session_client(
     session: Optional[SessionProxy],
     service_name: str,
@@ -341,3 +552,19 @@ def _get_session_client(
         )
         return client
     return None
+
+
+def _get_model_tags_from_tags(
+    tags: List[Dict[str, Any]],
+) -> List[Tag]:
+    """Create and return a list of model.Tags from tags."""
+    LOG.debug("_get_model_tags_from_tags()")
+
+    model_tags = [
+        Tag(
+            Key=tag.get("Key"),
+            Value=tag.get("Value"),
+        )
+        for tag in tags
+    ]
+    return model_tags
