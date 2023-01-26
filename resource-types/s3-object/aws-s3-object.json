@@ -3,23 +3,6 @@
     "description": "An example resource schema demonstrating some basic constructs and validation rules.",
     "sourceUrl": "https://github.com/aws-cloudformation/aws-cloudformation-rpdk.git",
     "definitions": {
-        "InitechDateFormat": {
-            "$comment": "Use the `definitions` block to provide shared resource property schemas",
-            "type": "string",
-            "format": "date-time"
-        },
-        "Memo": {
-            "type": "object",
-            "properties": {
-                "Heading": {
-                    "type": "string"
-                },
-                "Body": {
-                    "type": "string"
-                }
-            },
-            "additionalProperties": false
-        },
         "Tag": {
             "description": "A key-value pair to associate with a resource.",
             "type": "object",
@@ -45,46 +28,25 @@
         }
     },
     "properties": {
-        "TPSCode": {
-            "description": "A TPS Code is automatically generated on creation and assigned as the unique identifier.",
+        "ObjectArn": {
+            "description": "Primary Identifier of S3 Object",
+            "type": "string"
+        },
+        "ObjectKey": {
+            "description": "TODO",
             "type": "string",
-            "pattern": "^[A-Z]{3,5}[0-9]{8}-[0-9]{4}$"
+            "pattern": "^[a-zA-Z0-9!_.*'()-]+(/[a-zA-Z0-9!_.*'()-]+)*$"
         },
-        "Title": {
-            "description": "The title of the TPS report is a mandatory element.",
-            "type": "string",
-            "minLength": 20,
-            "maxLength": 250
-        },
-        "CoverSheetIncluded": {
-            "description": "Required for all TPS Reports submitted after 2/19/1999",
-            "type": "boolean"
-        },
-        "DueDate": {
-            "$ref": "#/definitions/InitechDateFormat"
-        },
-        "ApprovalDate": {
-            "$ref": "#/definitions/InitechDateFormat"
-        },
-        "Memo": {
-            "$ref": "#/definitions/Memo"
-        },
-        "SecondCopyOfMemo": {
-            "description": "In case you didn't get the first one.",
-            "$ref": "#/definitions/Memo"
-        },
-        "TestCode": {
-            "type": "string",
-            "enum": [
-                "NOT_STARTED",
-                "CANCELLED"
+        "BucketName": {
+            "description": "TODO",
+            "type": [
+                "string",
+                "object"
             ]
         },
-        "Authors": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
+        "ObjectContents": {
+            "description": "TODO",
+            "type": "string"
         },
         "Tags": {
             "description": "An array of key-value pairs to apply to this resource.",
@@ -98,39 +60,40 @@
     },
     "additionalProperties": false,
     "required": [
-        "TestCode",
-        "Title"
+        "ObjectKey",
+        "BucketName",
+        "ObjectContents"
     ],
     "readOnlyProperties": [
-        "/properties/TPSCode"
+        "/properties/ObjectArn"
     ],
     "primaryIdentifier": [
-        "/properties/TPSCode"
+        "/properties/ObjectArn"
     ],
     "handlers": {
         "create": {
             "permissions": [
-                "initech:CreateReport"
+                "s3:PutObject"
             ]
         },
         "read": {
             "permissions": [
-                "initech:DescribeReport"
+                "s3:GetObject"
             ]
         },
         "update": {
             "permissions": [
-                "initech:UpdateReport"
+                "s3:PutObject"
             ]
         },
         "delete": {
             "permissions": [
-                "initech:DeleteReport"
+                "s3:DeleteObject"
             ]
         },
         "list": {
             "permissions": [
-                "initech:ListReports"
+                "s3:ListObjects"
             ]
         }
     }

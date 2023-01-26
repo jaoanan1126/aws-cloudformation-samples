@@ -30,11 +30,10 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                - "initech:CreateReport"
-                - "initech:DeleteReport"
-                - "initech:DescribeReport"
-                - "initech:ListReports"
-                - "initech:UpdateReport"
+                - "s3:DeleteObject"
+                - "s3:GetObject"
+                - "s3:ListObjects"
+                - "s3:PutObject"
                 Resource: "*"
 Outputs:
   ExecutionRoleArn:
