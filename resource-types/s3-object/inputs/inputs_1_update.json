@@ -1,0 +1,5 @@
+{
+    "BucketName": "testbucket",
+    "ObjectKey": "file.txt",
+    "ObjectContents": "hello"
+  }
