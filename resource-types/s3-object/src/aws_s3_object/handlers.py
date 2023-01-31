@@ -101,9 +101,7 @@ def _put_object(
     client
 ) -> bool:  
     response = client.put_object(Bucket = s3_params["Bucket"], Key = s3_params["Key"], Body= s3_params["Body"])
-    if "VersionId" not in response:
-        return False
-    return True
+    return response != None
 
 
 def _upload_s3_helper(    
@@ -270,7 +268,7 @@ def read_handler(
             Key=model_object_key
         )
         object_body = response['Body']
-        object_body_contents = object_body.read()
+        object_body_contents = object_body.read().decode("utf-8")
         if model:
             model.ObjectContents = object_body_contents
         
@@ -298,7 +296,7 @@ def read_handler(
             handler_error_code=_get_handler_error_code(
                 ce.response["Error"]["Code"],
             ),
-            error_message=str(ce),
+            error_message=str(gse),
             traceback_content=traceback.format_exc(),
         )
     except Exception as e:
@@ -308,7 +306,7 @@ def read_handler(
             traceback_content=traceback.format_exc(),
         )
     return _progress_event_success(
-        model=model,
+        model=model
     )
 
 
