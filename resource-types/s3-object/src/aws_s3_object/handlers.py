@@ -232,7 +232,7 @@ def delete_handler(
             traceback_content=traceback.format_exc(),
         )
     return _progress_event_success(
-        model=model,
+        is_delete_handler=True
     )
 
 
