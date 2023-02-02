@@ -3,7 +3,7 @@
 Congratulations on starting development! Next steps:
 
 1. Write the JSON schema describing your resource, `aws-s3-object.json`
-2. Implement your resource handlers in `aws_s3_object/handlers.py`
+2. Implement your resource handlers in `awscommunity_s3_object/handlers.py`
 
 > Don't modify `models.py` by hand, any modifications will be overwritten when the `generate` or `package` commands are run.
 

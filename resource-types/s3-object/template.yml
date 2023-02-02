@@ -11,14 +11,14 @@ Resources:
   TypeFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: aws_s3_object.handlers.resource
+      Handler: awscommunity_s3_object.handlers.resource
       Runtime: python3.9
       CodeUri: build/
 
   TestEntrypoint:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: aws_s3_object.handlers.test_entrypoint
+      Handler: awscommunity_s3_object.handlers.test_entrypoint
       Runtime: python3.9
       CodeUri: build/
 

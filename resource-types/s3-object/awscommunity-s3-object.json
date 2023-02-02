@@ -1,5 +1,5 @@
 {
-    "typeName": "AWS::S3::Object",
+    "typeName": "AwsCommunity::S3::Object",
     "description": "An example resource schema demonstrating some basic constructs and validation rules.",
     "sourceUrl": "https://github.com/aws-cloudformation/aws-cloudformation-rpdk.git",
     "definitions": {
@@ -70,6 +70,13 @@
     "primaryIdentifier": [
         "/properties/ObjectArn"
     ],
+    "tagging": {
+        "taggable": true,
+        "tagOnCreate": true,
+        "tagUpdatable": true,
+        "cloudFormationSystemTags": false,
+        "tagProperty": "/properties/Tags"
+    },
     "handlers": {
         "create": {
             "permissions": [
