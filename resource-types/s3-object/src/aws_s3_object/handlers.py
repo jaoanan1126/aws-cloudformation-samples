@@ -332,14 +332,17 @@ def list_handler(
         response = client.list_objects_v2(
             Bucket=model_bucket_name
         )
-        contents = response['Contents']
-        models = [ ResourceModel(
-            ObjectArn=f'arn:aws:s3:::{model_bucket_name}/{content["Key"]}',
-            ObjectKey=content['Key'],
-            BucketName=model_bucket_name,
-            ObjectContents=None,
-            Tags=None
-        ) for content in contents ]
+        if 'Contents' in response.keys():
+            contents = response['Contents']
+            models = [ ResourceModel(
+                ObjectArn=f'arn:aws:s3:::{model_bucket_name}/{content["Key"]}',
+                ObjectKey=content['Key'],
+                BucketName=model_bucket_name,
+                ObjectContents=None,
+                Tags=None
+            ) for content in contents ]
+        else:
+            models = []
     except botocore.exceptions.ClientError as ce:
         return _progress_event_failed(
             handler_error_code=_get_handler_error_code(
