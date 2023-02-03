@@ -139,7 +139,7 @@ def update_handler(
         resourceModel=model,
     )
     # Check if update invocation 
-    if not _is_callback(callback_context):
+    if _is_callback(callback_context):
         return _callback_helper(
             session,
             request,
@@ -174,7 +174,9 @@ def update_handler(
             error_message=str(e),
             traceback_content=traceback.format_exc(),
         )
-    return read_handler(session, request, callback_context)
+    return _progress_event_callback(
+        model = model
+    )
 
 
 @resource.handler(Action.DELETE)
