@@ -1,10 +1,10 @@
 {
     "artifact_type": "RESOURCE",
-    "typeName": "AWS::S3::Object",
+    "typeName": "AwsCommunity::S3::Object",
     "language": "python39",
     "runtime": "python3.9",
-    "entrypoint": "aws_s3_object.handlers.resource",
-    "testEntrypoint": "aws_s3_object.handlers.test_entrypoint",
+    "entrypoint": "awscommunity_s3_object.handlers.resource",
+    "testEntrypoint": "awscommunity_s3_object.handlers.test_entrypoint",
     "settings": {
         "version": false,
         "subparser_name": null,
