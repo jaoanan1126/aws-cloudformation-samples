@@ -1,4 +1,4 @@
-# AWS::S3::Object Tag
+# AwsCommunity::S3::Object Tag
 
 A key-value pair to associate with a resource.
 

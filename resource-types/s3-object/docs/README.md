@@ -1,4 +1,4 @@
-# AWS::S3::Object
+# AwsCommunity::S3::Object
 
 An example resource schema demonstrating some basic constructs and validation rules.
 
@@ -10,7 +10,7 @@ To declare this entity in your AWS CloudFormation template, use the following sy
 
 <pre>
 {
-    "Type" : "AWS::S3::Object",
+    "Type" : "AwsCommunity::S3::Object",
     "Properties" : {
         "<a href="#objectkey" title="ObjectKey">ObjectKey</a>" : <i>String</i>,
         "<a href="#bucketname" title="BucketName">BucketName</a>" : <i>String, Map</i>,
@@ -23,7 +23,7 @@ To declare this entity in your AWS CloudFormation template, use the following sy
 ### YAML
 
 <pre>
-Type: AWS::S3::Object
+Type: AwsCommunity::S3::Object
 Properties:
     <a href="#objectkey" title="ObjectKey">ObjectKey</a>: <i>String</i>
     <a href="#bucketname" title="BucketName">BucketName</a>: <i>String, Map</i>

@@ -25,7 +25,7 @@ from .models import ResourceHandlerRequest, ResourceModel, Tag
 CALLBACK_DELAY_SECONDS = 5
 LOG = logging.getLogger(__name__)
 
-TYPE_NAME = "AWS::S3::Object"
+TYPE_NAME = "AwsCommunity::S3::Object"
 resource = Resource(TYPE_NAME, ResourceModel)
 test_entrypoint = resource.test_entrypoint
 
@@ -71,12 +71,21 @@ def create_handler(
         # Setting Status to success will signal to cfn that the operation is complete
         progress.status = OperationStatus.SUCCESS
         model.ObjectArn = f"arn:aws:s3:::{model.BucketName}/{model.ObjectKey}"
-    except TypeError as e:
-        # exceptions module lets CloudFormation know the type of failure that occurred
-        raise exceptions.InternalFailure(f"was not expecting type {e}")
-        # this can also be done by returning a failed progress event
-        # return ProgressEvent.failed(HandlerErrorCode.InternalFailure, f"was not expecting type {e}")
 
+    except botocore.exceptions.ClientError as ce:
+        return _progress_event_failed(
+            handler_error_code=_get_handler_error_code(
+                ce.response["Error"]["Code"],
+            ),
+            error_message=str(ce),
+            traceback_content=traceback.format_exc(),
+        )
+    except Exception as e:
+        return _progress_event_failed(
+            handler_error_code=HandlerErrorCode.InternalFailure,
+            error_message=str(e),
+            traceback_content=traceback.format_exc(),
+        )
     return _progress_event_callback(
         model = model
     )
@@ -151,12 +160,20 @@ def update_handler(
         # Setting Status to success will signal to cfn that the operation is complete
         progress.status = OperationStatus.SUCCESS
         model.ObjectArn = f"arn:aws:s3:::{model.BucketName}/{model.ObjectKey}"
-    except TypeError as e:
-        # exceptions module lets CloudFormation know the type of failure that occurred
-        raise exceptions.InternalFailure(f"was not expecting type {e}")
-        # this can also be done by returning a failed progress event
-        # return ProgressEvent.failed(HandlerErrorCode.InternalFailure, f"was not expecting type {e}")
-
+    except botocore.exceptions.ClientError as ce:
+        return _progress_event_failed(
+            handler_error_code=_get_handler_error_code(
+                ce.response["Error"]["Code"],
+            ),
+            error_message=str(ce),
+            traceback_content=traceback.format_exc(),
+        )
+    except Exception as e:
+        return _progress_event_failed(
+            handler_error_code=HandlerErrorCode.InternalFailure,
+            error_message=str(e),
+            traceback_content=traceback.format_exc(),
+        )
     return read_handler(session, request, callback_context)
 
 
@@ -232,7 +249,7 @@ def delete_handler(
             traceback_content=traceback.format_exc(),
         )
     return _progress_event_success(
-        model=model,
+        is_delete_handler=True
     )
 
 
