@@ -139,7 +139,7 @@ def update_handler(
         resourceModel=model,
     )
     # Check if update invocation 
-    if not _is_callback(callback_context):
+    if _is_callback(callback_context):
         return _callback_helper(
             session,
             request,
@@ -174,7 +174,9 @@ def update_handler(
             error_message=str(e),
             traceback_content=traceback.format_exc(),
         )
-    return read_handler(session, request, callback_context)
+    return _progress_event_callback(
+        model = model
+    )
 
 
 @resource.handler(Action.DELETE)
@@ -349,14 +351,17 @@ def list_handler(
         response = client.list_objects_v2(
             Bucket=model_bucket_name
         )
-        contents = response['Contents']
-        models = [ ResourceModel(
-            ObjectArn=f'arn:aws:s3:::{model_bucket_name}/{content["Key"]}',
-            ObjectKey=content['Key'],
-            BucketName=model_bucket_name,
-            ObjectContents=None,
-            Tags=None
-        ) for content in contents ]
+        if 'Contents' in response.keys():
+            contents = response['Contents']
+            models = [ ResourceModel(
+                ObjectArn=f'arn:aws:s3:::{model_bucket_name}/{content["Key"]}',
+                ObjectKey=content['Key'],
+                BucketName=model_bucket_name,
+                ObjectContents=None,
+                Tags=None
+            ) for content in contents ]
+        else:
+            models = []
     except botocore.exceptions.ClientError as ce:
         return _progress_event_failed(
             handler_error_code=_get_handler_error_code(

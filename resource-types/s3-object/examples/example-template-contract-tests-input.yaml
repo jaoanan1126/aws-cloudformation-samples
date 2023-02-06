@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Template used for contract tests input of an example resource type to create an S3 Object; input data will be made available to contract tests by using the S3BucketNameForContractTests Export shown in the Outputs section of this template.
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+
+Outputs:
+  S3BucketName:
+    Description: The S3 bucket name of the bucket you wish to use for contract testing.
+    Value: !Ref S3Bucket
+    Export: 
+      Name: S3BucketNameForContractTests

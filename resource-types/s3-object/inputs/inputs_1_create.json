@@ -1,5 +1,5 @@
 {
-    "BucketName": "testbucket",
-    "ObjectKey": "file.txt",
-    "ObjectContents": "hello"
+    "BucketName": "{{S3BucketNameForContractTests}}",
+    "ObjectKey": "test-file.txt",
+    "ObjectContents": "Hello world!"
   }
