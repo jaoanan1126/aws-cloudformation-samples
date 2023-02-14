@@ -45,7 +45,7 @@ class ResourceModel(BaseModel):
     ObjectKey: Optional[str]
     BucketName: Optional[Any]
     ObjectContents: Optional[str]
-    Tags: Optional[AbstractSet["_Tag"]]
+    Tags: Optional[Sequence["_Tag"]]
 
     @classmethod
     def _deserialize(
@@ -61,7 +61,7 @@ class ResourceModel(BaseModel):
             ObjectKey=json_data.get("ObjectKey"),
             BucketName=json_data.get("BucketName"),
             ObjectContents=json_data.get("ObjectContents"),
-            Tags=set_or_none(json_data.get("Tags")),
+            Tags=deserialize_list(json_data.get("Tags"), Tag),
         )
 
 

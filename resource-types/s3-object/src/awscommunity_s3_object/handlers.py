@@ -6,7 +6,8 @@ from typing import (
     Dict,
     List,
     MutableMapping,
-    Optional
+    Optional,
+    Mapping
 )
 from cloudformation_cli_python_lib import (
     Action,
@@ -63,11 +64,13 @@ def create_handler(
     try:
         client = _get_session_client(session, "s3")
         #Prepare kwargs to pass 
+
         s3_params = _upload_s3_helper(model, request)
         is_uploaded =  _put_object(s3_params = s3_params, client = client)
 
         if not is_uploaded:
             raise Exception("File Failed to upload")
+
         # Setting Status to success will signal to cfn that the operation is complete
         progress.status = OperationStatus.SUCCESS
         model.ObjectArn = f"arn:aws:s3:::{model.BucketName}/{model.ObjectKey}"
@@ -109,7 +112,12 @@ def _put_object(
     s3_params: Dict[str,Any],
     client
 ) -> bool:  
-    response = client.put_object(Bucket = s3_params["Bucket"], Key = s3_params["Key"], Body= s3_params["Body"])
+    if "Tags" in s3_params:
+        response = client.put_object(Bucket = s3_params["Bucket"], Key = s3_params["Key"], Body= s3_params["Body"], 
+                                    Tagging = s3_params["Tags"]
+        )
+    else:
+        response = client.put_object(Bucket = s3_params["Bucket"], Key = s3_params["Key"], Body= s3_params["Body"])
     return response != None
 
 
@@ -124,7 +132,12 @@ def _upload_s3_helper(
             "Key": model.ObjectKey,
             "Body": model.ObjectContents
         }
-        return put_object_param
+    if model and model.Tags:
+        tags = _build_tag_list(model= model, request=request)
+        tag_entry = '&'.join(str(tag) for tag in tags)
+        put_object_param["Tags"] = tag_entry
+
+    return put_object_param
 
 @resource.handler(Action.UPDATE)
 def update_handler(
@@ -574,6 +587,33 @@ def _get_session_client(
     return None
 
 
+def _get_tags_from_previous_resource_tags(
+    previous_resource_tags: Mapping[str, Any],
+) -> List[Dict[str, Any]]:
+    """Create and return a list of tags from request.previousResourceTags."""
+    LOG.debug("_get_tags_from_previous_resource_tags()")
+
+    tags = [
+        {
+            "Key": previous_resource_tag,
+            "Value": previous_resource_tags[previous_resource_tag],
+        }
+        for previous_resource_tag in previous_resource_tags
+    ]
+    return tags
+
+
+def _get_tags_from_model_tags(
+    model_tags,
+) -> List[str]:
+    """Create and return a list of tags from model.Tags."""
+    LOG.debug("_get_tags_from_model_tags()")
+    tags = []
+    for model_tag in model_tags: 
+        tags += [model_tag.Key + "=" +model_tag.Value]
+    return tags
+
+
 def _get_model_tags_from_tags(
     tags: List[Dict[str, Any]],
 ) -> List[Tag]:
@@ -588,3 +628,40 @@ def _get_model_tags_from_tags(
         for tag in tags
     ]
     return model_tags
+
+
+def _get_tags_from_desired_resource_tags(
+    desired_resource_tags: Mapping[str, Any],
+) -> List[str]:
+    """Create and return a list of tags from request.desiredResourceTags."""
+    LOG.debug("_get_tags_from_desired_resource_tags()")
+
+    for desired_resource_tag in desired_resource_tags: 
+        tags += [desired_resource_tag + "=" +desired_resource_tags[desired_resource_tag]]
+    return tags
+
+def _build_tag_list(
+    model: Optional[ResourceModel],
+    request: ResourceHandlerRequest,
+) -> List[Dict[str, Any]]:
+    """Build and return a list of resource tags."""
+    LOG.debug("_build_tag_list()")
+
+    tags = []
+
+    # Determine if stack-level tags are present.
+    if request.desiredResourceTags:
+        desired_resource_tags = _get_tags_from_desired_resource_tags(
+            request.desiredResourceTags,
+        )
+        tags += desired_resource_tags
+
+    # Retrieve tags if specified in the model.
+    if model and model.Tags:
+        model_tags = _get_tags_from_model_tags(
+            model.Tags,
+        )
+        tags += model_tags
+
+    return tags
+
