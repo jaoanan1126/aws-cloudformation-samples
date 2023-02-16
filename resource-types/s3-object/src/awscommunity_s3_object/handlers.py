@@ -15,9 +15,7 @@ from cloudformation_cli_python_lib import (
     OperationStatus,
     ProgressEvent,
     Resource,
-    SessionProxy,
-    exceptions,
-    identifier_utils,
+    SessionProxy
 )
 
 from .models import ResourceHandlerRequest, ResourceModel, Tag
@@ -130,7 +128,7 @@ def _upload_s3_helper(
         put_object_param = {
             "Bucket": model.BucketName,
             "Key": model.ObjectKey,
-            "Body": model.ObjectContents
+            "Body": model.ObjectContents.encode("utf-8")
         }
     if model and model.Tags:
         tags = _build_tag_list(model= model, request=request)
@@ -164,6 +162,13 @@ def update_handler(
 
     try:
         client = _get_session_client(session, "s3")
+        
+        # Try finding object, and return a NotFound handler error code if the resource is not found.
+        client.get_object(
+            Bucket=model.BucketName,
+            Key=model.ObjectKey
+        )
+        
         #Prepare kwargs to pass 
         s3_params = _upload_s3_helper(model, request)
         is_uploaded =  _put_object(s3_params = s3_params, client = client)
@@ -323,14 +328,6 @@ def read_handler(
             error_message=str(ce),
             traceback_content=traceback.format_exc(),
         )
-    except botocore.exceptions.GeneralServiceException as gse:
-        return _progress_event_failed(
-            handler_error_code=_get_handler_error_code(
-                ce.response["Error"]["Code"],
-            ),
-            error_message=str(gse),
-            traceback_content=traceback.format_exc(),
-        )
     except Exception as e:
         return _progress_event_failed(
             handler_error_code=HandlerErrorCode.InternalFailure,
@@ -368,8 +365,8 @@ def list_handler(
             contents = response['Contents']
             models = [ ResourceModel(
                 ObjectArn=f'arn:aws:s3:::{model_bucket_name}/{content["Key"]}',
-                ObjectKey=content['Key'],
-                BucketName=model_bucket_name,
+                ObjectKey=None,
+                BucketName=None,
                 ObjectContents=None,
                 Tags=None
             ) for content in contents ]
